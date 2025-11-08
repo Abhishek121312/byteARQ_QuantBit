@@ -48,7 +48,11 @@ export default function ReportIssuePage() {
     const fetchWards = async () => {
       try {
         setLoadingWards(true);
+        // --- THIS IS THE FIX ---
+        // Changed from '/api/public/wards' to '/public/wards'
+        // The '/api' is already in axiosClient.js
         const response = await axiosClient.get('/api/public/wards');
+        // --- END OF FIX ---
         setWards(response.data);
       } catch (err) {
         console.error("Failed to fetch wards:", err);
@@ -83,6 +87,7 @@ export default function ReportIssuePage() {
     }
 
     try {
+      // This URL is correct, as it doesn't start with '/api'
       await axiosClient.post('/api/issues', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -106,15 +111,15 @@ export default function ReportIssuePage() {
       {/* Success Message */}
       {success && (
           <div role="alert" className="alert alert-success mb-6">
-              <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              <span>{success}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>{success}</span>
           </div>
       )}
       {/* Error Message */}
       {error && (
           <div role="alert" className="alert alert-error mb-6">
-              <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              <span>{error}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>{error}</span>
           </div>
       )}
 
@@ -148,7 +153,7 @@ export default function ReportIssuePage() {
               >
                 <option value="Lighting">Lighting</option>
                 <option value="Waste">Waste</option>
-                <option value="Road">Road</option>
+                <option valueT="Road">Road</option>
                 <option value="Other">Other</option>
               </select>
               {errors.category && <span className="text-error text-xs mt-1">{errors.category.message}</span>}
@@ -190,6 +195,7 @@ export default function ReportIssuePage() {
               render={({ field }) => (
                 <LocationPicker
                   onLocationSelect={(latlng) => field.onChange(latlng)}
+                  disableSearch={true} // This forces it to use current location
                 />
               )}
             />

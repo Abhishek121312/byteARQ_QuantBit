@@ -2,7 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom class to hide Leaflet routing machine's text instructions */
-.hide-routing-instructions .leaflet-routing-container {
+/* --- ADD THIS RULE ---
+  This will hide the Leaflet attribution text on all maps.
+*/
+.leaflet-control-attribution {
   display: none !important;
 }

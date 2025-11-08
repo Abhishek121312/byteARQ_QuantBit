@@ -3,6 +3,61 @@ const User = require('../models/user');
 const Issue = require('../models/issue');
 const mongoose = require('mongoose');
 
+// --- NEW FUNCTION: Create Officer ---
+// @desc    Create a new officer
+// @route   POST /api/admin/officers
+// @access  Private/Admin
+const createOfficer = async (req, res) => {
+    try {
+        const { email, password, firstName, lastName, ward } = req.body;
+
+        // Basic validation
+        if (!email || !password || !firstName || !ward) {
+            return res.status(400).json({ message: 'Email, password, first name, and ward are required.' });
+        }
+
+        // Check if user already exists
+        const userExists = await User.findOne({ email });
+        if (userExists) {
+            return res.status(400).json({ message: 'User with this email already exists' });
+        }
+        
+        // Check if ward exists
+        const wardExists = await Ward.findById(ward);
+        if (!wardExists) {
+            return res.status(404).json({ message: 'Ward not found' });
+        }
+
+        // Create user with 'Officer' role
+        const officer = await User.create({
+            email,
+            password,
+            firstName,
+            lastName,
+            ward,
+            role: 'Officer' // Explicitly set role
+        });
+        
+        if (officer) {
+            // Don't send password back
+            const officerData = await User.findById(officer._id).select('-password').populate('ward', 'name');
+            
+            // --- IMPORTANT: Add officer to the ward's assignedOfficers array ---
+            wardExists.assignedOfficers.push(officer._id);
+            await wardExists.save();
+            
+            res.status(201).json(officerData);
+        } else {
+            res.status(400).json({ message: 'Invalid officer data provided' });
+        }
+
+    } catch (error) {
+        console.error("Error creating officer:", error);
+        res.status(500).json({ message: 'Server Error creating officer: ' + error.message });
+    }
+};
+// --- END NEW FUNCTION ---
+
 // @desc    Add a new ward
 // @route   POST /api/admin/wards
 // @access  Private/Admin
@@ -111,6 +166,11 @@ const assignIssueToOfficer = async (req, res) => {
         if (!officer || officer.role !== 'Officer') {
             return res.status(404).json({ message: 'Officer not found or user is not an Officer' });
         }
+        
+        // --- Check if officer is in the same ward as the issue ---
+        if (issue.ward.toString() !== officer.ward.toString()) {
+            return res.status(400).json({ message: 'Officer must be assigned to the same ward as the issue.' });
+        }
 
         issue.assignedTo = officerId;
         // Optionally update status to 'In Progress'
@@ -156,5 +216,6 @@ module.exports = {
     getAllOfficers,
     getAllCitizens,
     getAdminAllIssues,
-    assignIssueToOfficer
+    assignIssueToOfficer,
+    createOfficer, // --- ADDED ---
 };

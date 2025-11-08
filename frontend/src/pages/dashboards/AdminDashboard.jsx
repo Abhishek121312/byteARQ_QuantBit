@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-// --- FIX: Added 'Controller' to the import ---
-import { useForm, Controller } from 'react-hook-form'; 
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import axiosClient from '../../utils/axiosClient';
@@ -21,6 +20,15 @@ const addWardSchema = z.object({
 // Zod schema for assigning an issue
 const assignIssueSchema = z.object({
   officerId: z.string().min(1, "You must select an officer"),
+});
+
+// Zod schema for adding an officer
+const addOfficerSchema = z.object({
+  firstName: z.string().min(2, "First name is required"),
+  lastName: z.string().min(2, "Last name is required"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  ward: z.string().min(1, "You must select a ward"),
 });
 
 // Reusable Stat Card (from CitizenDashboard)
@@ -55,13 +63,14 @@ export default function AdminDashboard({ user }) {
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [isAssigning, setIsAssigning] = useState(false);
   const [isAddingWard, setIsAddingWard] = useState(false);
+  const [isAddingOfficer, setIsAddingOfficer] = useState(false);
+  const [viewingImage, setViewingImage] = useState(null); // --- ADDED ---
 
   // Form for adding a ward
   const { 
     register: registerWard, 
     handleSubmit: handleWardSubmit, 
-    setValue: setWardValue,
-    control: wardControl, // This control is now correctly defined
+    control: wardControl,
     reset: resetWardForm,
     formState: { errors: wardErrors } 
   } = useForm({
@@ -77,6 +86,16 @@ export default function AdminDashboard({ user }) {
     formState: { errors: assignErrors } 
   } = useForm({
     resolver: zodResolver(assignIssueSchema)
+  });
+
+  // Form for adding an officer
+  const {
+    register: registerOfficer,
+    handleSubmit: handleOfficerSubmit,
+    reset: resetOfficerForm,
+    formState: { errors: officerErrors }
+  } = useForm({
+    resolver: zodResolver(addOfficerSchema)
   });
 
   // --- Data Fetching ---
@@ -166,6 +185,12 @@ export default function AdminDashboard({ user }) {
     document.getElementById('assign_modal').showModal();
   };
   
+  // --- ADDED: Function to open image modal ---
+  const openImageModal = (imageUrl) => {
+    setViewingImage(imageUrl);
+    document.getElementById('image_modal_admin').showModal();
+  };
+
   const onAssignSubmit = async (data) => {
     setIsAssigning(true);
     try {
@@ -180,7 +205,7 @@ export default function AdminDashboard({ user }) {
       document.getElementById('assign_modal').close();
       setSelectedIssue(null);
     } catch (err) {
-      alert("Failed to assign issue.");
+      alert(err.response?.data?.message || "Failed to assign issue.");
     } finally {
       setIsAssigning(false);
     }
@@ -210,10 +235,39 @@ export default function AdminDashboard({ user }) {
     }
   };
 
+  const onAddOfficerSubmit = async (data) => {
+    setIsAddingOfficer(true);
+    try {
+      const response = await axiosClient.post('/api/admin/officers', data);
+      
+      // Add new officer to state
+      setOfficers(currentOfficers => [response.data, ...currentOfficers]);
+      // Update officer count
+      setStats(s => ({ ...s, officers: s.officers + 1 }));
+      // Update the ward's officer count in the wards list
+      setWards(currentWards => currentWards.map(w => {
+        if (w._id === data.ward) {
+          // Check if assignedOfficers exists, if not, initialize
+          const existingOfficers = w.assignedOfficers || [];
+          return { ...w, assignedOfficers: [...existingOfficers, response.data] };
+        }
+        return w;
+      }));
+
+      document.getElementById('add_officer_modal').close();
+      resetOfficerForm();
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to add officer.");
+    } finally {
+      setIsAddingOfficer(false);
+    }
+  };
+
   const renderContent = () => {
     switch (activeTab) {
-      case 'issues': return <IssueManagement issues={issues} loading={loading.issues} officers={officers} onAssignClick={openAssignModal} />;
-      case 'officers': return <UserManagement title="Officers" users={officers} loading={loading.officers} />;
+      // --- MODIFIED: Pass image click handler ---
+      case 'issues': return <IssueManagement issues={issues} loading={loading.issues} officers={officers} onAssignClick={openAssignModal} onViewImageClick={openImageModal} />;
+      case 'officers': return <UserManagement title="Officers" users={officers} loading={loading.officers} wards={wards} />;
       case 'citizens': return <UserManagement title="Citizens" users={citizens} loading={loading.citizens} />;
       case 'wards': return <WardManagement wards={wards} loading={loading.wards} />;
       default: return null;
@@ -346,7 +400,6 @@ export default function AdminDashboard({ user }) {
             <div className="form-control">
               <label className="label"><span className="label-text font-medium">Pin Ward Location</span></label>
               <p className="text-xs text-neutral-500 mb-2">Click on the map to set the ward's central location.</p>
-              {/* This is the line that was breaking */}
               <Controller
                 name="location"
                 control={wardControl}
@@ -367,13 +420,111 @@ export default function AdminDashboard({ user }) {
         </div>
         <form method="dialog" className="modal-backdrop"><button type="button" onClick={() => resetWardForm()}>close</button></form>
       </dialog>
+
+      {/* --- NEW MODAL: Add Officer --- */}
+      <dialog id="add_officer_modal" className="modal">
+        <div className="modal-box w-11/12 max-w-2xl bg-base-100">
+          <form method="dialog">
+            <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" type="button" onClick={() => resetOfficerForm()}>✕</button>
+          </form>
+          <h3 className="font-bold text-2xl mb-6">Create Officer Account</h3>
+          <form onSubmit={handleOfficerSubmit(onAddOfficerSubmit)} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="form-control">
+                <label className="label"><span className="label-text font-medium">First Name</span></label>
+                <input
+                  {...registerOfficer('firstName')}
+                  className={`input input-bordered w-full ${officerErrors.firstName ? 'input-error' : ''}`}
+                />
+                {officerErrors.firstName && <span className="text-error text-xs mt-1">{officerErrors.firstName.message}</span>}
+              </div>
+              <div className="form-control">
+                <label className="label"><span className="label-text font-medium">Last Name</span></label>
+                <input
+                  {...registerOfficer('lastName')}
+                  className={`input input-bordered w-full ${officerErrors.lastName ? 'input-error' : ''}`}
+                />
+                {officerErrors.lastName && <span className="text-error text-xs mt-1">{officerErrors.lastName.message}</span>}
+              </div>
+            </div>
+
+            <div className="form-control">
+              <label className="label"><span className="label-text font-medium">Email</span></label>
+              <input
+                {...registerOfficer('email')}
+                type="email"
+                placeholder="officer@example.com"
+                className={`input input-bordered w-full ${officerErrors.email ? 'input-error' : ''}`}
+              />
+              {officerErrors.email && <span className="text-error text-xs mt-1">{officerErrors.email.message}</span>}
+            </div>
+            
+            <div className="form-control">
+              <label className="label"><span className="label-text font-medium">Password</span></label>
+              <input
+                {...registerOfficer('password')}
+                type="password"
+                className={`input input-bordered w-full ${officerErrors.password ? 'input-error' : ''}`}
+              />
+              {officerErrors.password && <span className="text-error text-xs mt-1">{officerErrors.password.message}</span>}
+            </div>
+
+            <div className="form-control">
+              <label className="label"><span className="label-text font-medium">Assign to Ward</span></label>
+              <select 
+                {...registerOfficer('ward')}
+                className={`select select-bordered w-full ${officerErrors.ward ? 'select-error' : ''}`}
+                defaultValue=""
+              >
+                <option value="" disabled>Select a ward</option>
+                {wards.map(ward => (
+                  <option key={ward._id} value={ward._id}>{ward.name}</option>
+                ))}
+              </select>
+              {officerErrors.ward && <span className="text-error text-xs mt-1">{officerErrors.ward.message}</span>}
+            </div>
+
+            <div className="modal-action">
+              <button type="submit" className="btn btn-primary" disabled={isAddingOfficer}>
+                {isAddingOfficer ? <span className="loading loading-spinner"></span> : 'Create Officer'}
+              </button>
+            </div>
+          </form>
+        </div>
+        <form method="dialog" className="modal-backdrop"><button type="button" onClick={() => resetOfficerForm()}>close</button></form>
+      </dialog>
+
+      {/* --- ADDED IMAGE MODAL --- */}
+      <dialog id="image_modal_admin" className="modal">
+        <div className="modal-box w-11/12 max-w-3xl bg-base-100">
+          <form method="dialog">
+            <button 
+              className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
+              onClick={() => setViewingImage(null)}
+            >✕</button>
+          </form>
+          <h3 className="font-bold text-lg mb-4">Issue Image</h3>
+          {viewingImage && (
+            <img 
+              src={viewingImage} 
+              alt="Issue" 
+              className="w-full h-auto rounded-lg object-contain"
+            />
+          )}
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button onClick={() => setViewingImage(null)}>close</button>
+        </form>
+      </dialog>
+
     </div>
   );
 }
 
 // --- Sub-Components for Admin Dashboard ---
 
-const IssueManagement = ({ issues, loading, officers, onAssignClick }) => {
+// --- MODIFIED: Added 'onViewImageClick' prop ---
+const IssueManagement = ({ issues, loading, officers, onAssignClick, onViewImageClick }) => {
   if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;
   if (issues.length === 0) return <div className="text-center py-20"><p className="text-lg text-neutral-500">No issues found.</p></div>;
 
@@ -414,7 +565,7 @@ const IssueManagement = ({ issues, loading, officers, onAssignClick }) => {
                   <span className="text-neutral-500 italic">Unassigned</span>
                 )}
               </td>
-              <td>
+              <td className="flex gap-2">
                 <button 
                   className="btn btn-primary btn-sm"
                   onClick={() => onAssignClick(issue)}
@@ -422,6 +573,16 @@ const IssueManagement = ({ issues, loading, officers, onAssignClick }) => {
                 >
                   {issue.assignedTo ? 'Re-assign' : 'Assign'}
                 </button>
+                {/* --- MODIFIED VIEW IMAGE BUTTON --- */}
+                {issue.imageUrl && (
+                  <button 
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => onViewImageClick(issue.imageUrl)}
+                  >
+                    View Image
+                  </button>
+                )}
+                {/* --- END MODIFIED BUTTON --- */}
               </td>
             </tr>
           ))}
@@ -431,38 +592,63 @@ const IssueManagement = ({ issues, loading, officers, onAssignClick }) => {
   );
 };
 
-const UserManagement = ({ title, users, loading }) => {
+// --- MODIFIED: Added 'wards' prop and "Add Officer" button ---
+const UserManagement = ({ title, users, loading, wards }) => {
   if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;
-  if (users.length === 0) return <div className="text-center py-20"><p className="text-lg text-neutral-500">No {title.toLowerCase()} found.</p></div>;
+
+  const isOfficerTab = title === 'Officers';
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-neutral-800 mb-6">{title}</h2>
-      <div className="overflow-x-auto">
-        <table className="table w-full table-zebra">
-          <thead className="bg-base-200">
-            <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Ward</th>
-              <th>Joined</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map(user => (
-              <tr key={user._id} className="hover">
-                <td>{user.firstName} {user.lastName}</td>
-                <td>{user.email}</td>
-                <td>{user.ward?.name || <span className="text-neutral-500 italic">N/A</span>}</td>
-                <td>{new Date(user.createdAt).toLocaleDateString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-neutral-800">{title}</h2>
+        {isOfficerTab && (
+          <button
+            className="btn btn-primary"
+            onClick={() => document.getElementById('add_officer_modal').showModal()}
+            disabled={!wards || wards.length === 0}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+            Add Officer
+          </button>
+        )}
       </div>
+      {isOfficerTab && (!wards || wards.length === 0) && (
+        <div className="alert alert-warning mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+          <span>Please add a Ward before you can add an Officer.</span>
+        </div>
+      )}
+      {users.length === 0 ? (
+        <div className="text-center py-20"><p className="text-lg text-neutral-500">No {title.toLowerCase()} found.</p></div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="table w-full table-zebra">
+            <thead className="bg-base-200">
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Ward</th>
+                <th>Joined</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map(user => (
+                <tr key={user._id} className="hover">
+                  <td>{user.firstName} {user.lastName}</td>
+                  <td>{user.email}</td>
+                  <td>{user.ward?.name || <span className="text-neutral-500 italic">N/A</span>}</td>
+                  <td>{new Date(user.createdAt).toLocaleDateString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };
+// --- END MODIFICATION ---
 
 const WardManagement = ({ wards, loading }) => {
   if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;

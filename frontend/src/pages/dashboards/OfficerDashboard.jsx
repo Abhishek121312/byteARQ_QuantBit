@@ -26,6 +26,7 @@ export default function OfficerDashboard({ user }) {
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [newStatus, setNewStatus] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState(null); // --- ADDED ---
 
   const fetchIssues = async () => {
     try {
@@ -103,6 +104,12 @@ export default function OfficerDashboard({ user }) {
     document.getElementById('status_modal').showModal();
   };
 
+  // --- ADDED: Function to open image modal ---
+  const openImageModal = (imageUrl) => {
+    setSelectedImageUrl(imageUrl);
+    document.getElementById('image_modal_officer').showModal();
+  };
+  
   const handleStatusUpdate = async (e) => {
     e.preventDefault();
     if (!newStatus || !selectedIssue) return;
@@ -198,13 +205,23 @@ export default function OfficerDashboard({ user }) {
                         issue.status === 'In Progress' ? 'badge-info' : 'badge-warning'
                       }`}>{issue.status}</span>
                     </td>
-                    <td>
+                    <td className="flex gap-2">
                       <button 
                         className="btn btn-primary btn-sm"
                         onClick={() => openStatusModal(issue)}
                       >
                         Update
                       </button>
+                      {/* --- MODIFIED VIEW IMAGE BUTTON --- */}
+                      {issue.imageUrl && (
+                        <button 
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => openImageModal(issue.imageUrl)}
+                        >
+                          View Image
+                        </button>
+                      )}
+                      {/* --- END MODIFIED BUTTON --- */}
                     </td>
                   </tr>
                 ))}
@@ -249,6 +266,29 @@ export default function OfficerDashboard({ user }) {
           </form>
         </div>
         <form method="dialog" className="modal-backdrop"><button>close</button></form>
+      </dialog>
+
+      {/* --- ADDED IMAGE MODAL --- */}
+      <dialog id="image_modal_officer" className="modal">
+        <div className="modal-box w-11/12 max-w-3xl bg-base-100">
+          <form method="dialog">
+            <button 
+              className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
+              onClick={() => setSelectedImageUrl(null)}
+            >✕</button>
+          </form>
+          <h3 className="font-bold text-lg mb-4">Issue Image</h3>
+          {selectedImageUrl && (
+            <img 
+              src={selectedImageUrl} 
+              alt="Issue" 
+              className="w-full h-auto rounded-lg object-contain"
+            />
+          )}
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button onClick={() => setSelectedImageUrl(null)}>close</button>
+        </form>
       </dialog>
     </div>
   );

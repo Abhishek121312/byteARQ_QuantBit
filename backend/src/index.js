@@ -6,12 +6,14 @@ const express = require('express');
  const redisClient = require('./config/redis');
  const cookieParser = require('cookie-parser');
  const cors = require('cors');
+ const multer = require('multer'); // Import multer for the error handler
  
  // --- MODIFIED: Import New Routers ---
  const authRoutes = require('./routes/authRoutes');
  const adminRoutes = require('./routes/adminRoutes');
- const issueRoutes = require('./routes/issueRoutes'); // New
+ const issueRoutes = require('./routes/issueRoutes');
  const userRoutes = require('./routes/userRoutes');
+ const publicRoutes = require('./routes/publicRoutes'); // --- 1. ADD THIS LINE ---
  
  const app = express();
  const server = http.createServer(app);
@@ -44,6 +46,7 @@ const express = require('express');
  app.use('/api/admin', adminRoutes);
  app.use('/api/issues', issueRoutes);
  app.use('/api/users', userRoutes);
+ app.use('/api/public', publicRoutes); // --- 2. ADD THIS LINE ---
  
  // --- MODIFIED: Real-time Communication Logic ---
  io.on('connection', (socket) => {

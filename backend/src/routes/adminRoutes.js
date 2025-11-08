@@ -7,7 +7,8 @@ const {
     getAllOfficers,
     getAllCitizens,
     getAdminAllIssues,
-    assignIssueToOfficer
+    assignIssueToOfficer,
+    createOfficer, // --- ADDED ---
 } = require('../controllers/adminController');
 const { protect, isAdmin } = require('../middleware/authMiddleware');
 
@@ -25,6 +26,7 @@ router.route('/wards/:id')
 
 // User Management
 router.get('/officers', getAllOfficers);
+router.post('/officers', createOfficer); // --- ADDED ---
 router.get('/citizens', getAllCitizens);
 
 // Issue Management

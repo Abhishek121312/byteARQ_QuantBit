@@ -39,7 +39,21 @@ const IssueCard = ({ issue }) => {
           </div>
           <span className={`badge ${statusColors[issue.status]}`}>{issue.status}</span>
         </div>
-        <p className="text-sm text-neutral-600 mt-2 h-12 overflow-hidden">
+
+        {/* --- ADDED IMAGE PREVIEW --- */}
+        {issue.imageUrl && (
+          <figure className="mt-4 rounded-lg overflow-hidden">
+            <img 
+              src={issue.imageUrl} 
+              alt={issue.title} 
+              className="w-full h-40 object-cover" 
+              onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.style.display = 'none'; }} // Hide if image fails to load
+            />
+          </figure>
+        )}
+        {/* --- END IMAGE PREVIEW --- */}
+        
+        <p className={`text-sm text-neutral-600 h-12 overflow-hidden ${issue.imageUrl ? 'mt-4' : 'mt-2'}`}>
           {issue.description || 'No description provided.'}
         </p>
         <div className="divider my-2"></div>
