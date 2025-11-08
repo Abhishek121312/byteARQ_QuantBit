@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom class to hide Leaflet routing machine's text instructions */
+.hide-routing-instructions .leaflet-routing-container {
+  display: none !important;
+}
